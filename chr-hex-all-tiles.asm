@@ -1,4 +1,4 @@
-.segment "CHR"
+.segment "CHR0"
 
 .macro hexChar val
 	.local @d0, @d1, @d2, @d3, @d4
