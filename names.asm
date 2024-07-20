@@ -4,16 +4,27 @@
 ; Typically, this will be included very early, since other libs depend
 ; on it, and it doesn't actually take any space in the final ROM.
 
+; PPU registers; see also: https://www.nesdev.org/wiki/PPU_registers
+
+; N0sBSIYX : NMI, sprite size, BG CHR, sprite CHR, incr. 1/32, scrollYX
 PPUCtrl   = $2000
+; BGRsbLCg : emphasize B,G,R; show sprites, BG; left-col spr, BG; grey
 PPUMask   = $2001
+; VSO----- : started vblank, sprite 0 hit, sprite overflow; clear latch
 PPUStatus = $2002
+; Scroll position; two writes: first X, then Y. PPUCtrl sets high bits.
 PPUScroll = $2005
+; Address to read/write; two writes: first high byte, then low byte.
 PPUAddr   = $2006
+; Data at the PPU address PPUAddr; non-palette reads are buffered.
 PPUData   = $2007
 
-; OAMAddr and OAMDMA are used to trigger a DMA transfer to PPU OAM.
+; OAM address register; writes cause OAM corruption
 OAMAddr = $2003
+; DMA address high byte; writes trigger DMA to PPU OAM
 OAMDMA  = $4014
+; OAMData should, in general, not be used directly, only via OAM DMA.
+;OAMData = $2004
 
 ; Sprite represents the layout of each entry in the OAM sprite metadata.
 ; See also: https://www.nesdev.org/wiki/PPU_OAM
@@ -23,6 +34,8 @@ OAMDMA  = $4014
 	Attr .byte ; Attributes: flip vert/horz, priority, palette index.
 	PosX .byte ; X coordinate (in pixels) of the sprite.
 .endstruct
+
+; APU registers; see also: https://www.nesdev.org/wiki/APU
 
 APUPulse1DutyVol = $4000 ; DDLCVVVV
 APUPulse1Sweep   = $4001 ; EPPPNSSS
