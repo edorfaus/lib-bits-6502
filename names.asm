@@ -70,8 +70,29 @@ APUDMCSampleLen  = $4013
 ;     Writing clears the DMC interrupt flag.
 APUStatusCtrl = $4015
 
-; APU Frame Counter (write)
+; APU Frame Counter (write); for read, see Controller2 below
 ;     MI------ : Mode (0 = 4-step, 1 = 5-step), Inhibit IRQ
 ;     Writing resets the frame counter, and if the M bit is set, clocks
 ;     all of the controlled units immediately.
 APUFrameCntr = $4017
+
+; Controller and expansion port registers
+; See also: https://www.nesdev.org/wiki/Input_devices
+
+; Controller 1 / latch bits (read/write)
+; Read: ---DDDDD : Input data lines D4 D3 D2 D1 D0 for controller 1
+;     Reading sends a strobe on the CLK line of controller 1.
+;     NES: D0, D3, D4 are controller port 1; D1, D2 are 0 or open bus.
+;     Famicom: D0 is joypad 1; D1 is expansion; D2 is mic (in JP2);
+;       D3, D4 are open bus.
+; Write: -----EEC : E = expansion port latch bits, C = controller latch
+;     The low 3 bits will be latched and held, and are available on the
+;     OUT lines of the controller ports and expansion port.
+Controller1 = $4016
+
+; Controller 2 (read); for write, see APUFrameCntr above
+;     ---DDDDD : Input data lines D4 D3 D2 D1 D0 for controller 2
+;     Reading sends a strobe on the CLK line of controller 2.
+;     NES: D0, D3, D4 are controller port 2; D1, D2 are 0 or open bus.
+;     Famicom: D0 is joypad 2; D1, D2, D3, D4 are expansion.
+Controller2 = $4017
