@@ -26,27 +26,27 @@ ControllerPrevious: .res 1
 
 ; Read the current value of the controller buttons.
 ; Updates: ControllerPress, ControllerNow, ControllerPrevious
-; Clobbers: A, X
+; Clobbers: A
 ControllerRead:
-	; Strobe the controller shift register
-	lda #%0000_0001
-	sta Controller1
-	lda #%0000_0000
-	sta Controller1
-
 	; Save the current values as the previous ones
 	lda ControllerNow
 	sta ControllerPrevious
 
+	; Strobe the controller shift register; initialize ControllerNow
+	lda #%0000_0001
+	sta Controller1
+	sta ControllerNow
+	lda #%0000_0000
+	sta Controller1
+
 	; Read the controllers
-	ldx #8
+	clc
 	@readLoop:
 		lda Controller1
 		ora Controller2
 		lsr a
 		rol ControllerNow
-	dex
-	bne @readLoop
+	bcc @readLoop
 
 	; Update the Press bits
 	lda ControllerPrevious
