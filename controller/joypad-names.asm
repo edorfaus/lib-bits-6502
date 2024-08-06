@@ -1,5 +1,5 @@
 ; This file contains some constants for the buttons of the regular
-; NES/Famicom controllers, as read by the other files in this directory.
+; NES/Famicom joypad controllers, as read by the other files here.
 ;
 ; It is separate because otherwise each of them would want a copy.
 
