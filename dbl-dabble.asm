@@ -37,19 +37,13 @@
 
 	; First 3 shifts don't need an add-check, since >= 5 needs 3 bits.
 	.repeat 3
-		asl bcdInput+0
-		.repeat .sizeof(bcdInput)-1, i
-			rol bcdInput+1+i
-		.endrepeat
+		asl bcdInput+.sizeof(bcdInput)-1
 		rol a
 	.endrepeat
 	sta @bcdScratch-0
 
-	.repeat 8 * .sizeof(bcdInput) - 3
-		asl bcdInput+0
-		.repeat .sizeof(bcdInput)-1, i
-			rol bcdInput+1+i
-		.endrepeat
+	.repeat 8 * .sizeof(bcdInput) - 3, bit
+		asl bcdInput+.sizeof(bcdInput)-1-((bit + 3) / 8)
 
 		.repeat @bcdScratchSize, i
 			ldx @bcdScratch-i
