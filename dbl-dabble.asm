@@ -30,9 +30,13 @@
 	; conversion to ASCII to happen in-place without temporary storage.
 	@bcdScratch = bcdOutput + @bcdScratchSize - 1
 
+	; Unfortunately, the @bcdScratch<N> variables can't be made local,
+	; since the .local keyword doesn't seem to work with .ident(...).
+
 	lda #0
 	.repeat @bcdScratchSize-1, i
 		sta @bcdScratch-(i+1)
+		.ident(.sprintf("@bcdScratch%d", i+1)) .set 0
 	.endrepeat
 
 	; First 3 shifts don't need an add-check, since >= 5 needs 3 bits.
@@ -40,18 +44,66 @@
 		asl bcdInput+.sizeof(bcdInput)-1
 		rol a
 	.endrepeat
+	@bcdScratch0 .set %0111
 	tax
 
+	.local @addCount, @shiftCount, @nextBit, @tmp
+	@addCount .set 0
+	@shiftCount .set 1
+
 	.repeat 8 * .sizeof(bcdInput) - 3, bit
+		; This code essentially runs the algorithm on build-time, using
+		; all 1-bits as input (on the assumption that hits the limits
+		; as fast or faster than any other input). The results are used
+		; to figure out when we need to start outputting code for each
+		; byte of the output, so we can avoid wasting cycles.
+		@nextBit .set 1
+		.repeat @shiftCount, i
+			@tmp .set .ident(.sprintf("@bcdScratch%d", i))
+
+			.if @tmp >= $50
+				@tmp .set @tmp + $30
+			.endif
+			.if (@tmp & $0F) >= $05
+				@tmp .set @tmp + $03
+
+				.if i >= @addCount
+					@addCount .set i + 1
+				.endif
+			.endif
+
+			@tmp .set (@tmp << 1) | @nextBit
+			@nextBit .set @tmp >> 8
+			@tmp .set @tmp & $FF
+
+			.ident(.sprintf("@bcdScratch%d", i)) .set @tmp
+		.endrepeat
+
+		.if @nextBit > 0
+			.ident(.sprintf("@bcdScratch%d", @shiftCount)) .set @nextBit
+			@shiftCount .set @shiftCount + 1
+
+			; Limit the byte count to the size of the scratch space.
+			.if @shiftCount > @bcdScratchSize
+				@shiftCount .set @bcdScratchSize
+			.endif
+		.endif
+
+		; Build-time done for this bit, now generate the run-time code.
+
 		asl bcdInput+.sizeof(bcdInput)-1-((bit + 3) / 8)
 
-		.repeat @bcdScratchSize, i
-			.if !(bit = 0 && i = 0)
-				ldx @bcdScratch-i
+		.repeat @shiftCount, i
+			.if i < @addCount
+				.if !(bit = 0 && i = 0)
+					ldx @bcdScratch-i
+				.endif
+				lda bcdAdd3Table, x
+				rol a
+				sta @bcdScratch-i
+			.else
+				rol @bcdScratch-i
 			.endif
-			lda bcdAdd3Table, x
-			rol a
-			sta @bcdScratch-i
 		.endrepeat
 	.endrepeat
 .endmacro
