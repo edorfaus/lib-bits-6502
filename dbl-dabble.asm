@@ -40,13 +40,15 @@
 		asl bcdInput+.sizeof(bcdInput)-1
 		rol a
 	.endrepeat
-	sta @bcdScratch-0
+	tax
 
 	.repeat 8 * .sizeof(bcdInput) - 3, bit
 		asl bcdInput+.sizeof(bcdInput)-1-((bit + 3) / 8)
 
 		.repeat @bcdScratchSize, i
-			ldx @bcdScratch-i
+			.if !(bit = 0 && i = 0)
+				ldx @bcdScratch-i
+			.endif
 			lda bcdAdd3Table, x
 			rol a
 			sta @bcdScratch-i
