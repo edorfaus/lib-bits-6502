@@ -45,11 +45,11 @@
 		rol a
 	.endrepeat
 	@bcdScratch0 .set %0111
-	tax
 
-	.local @addCount, @shiftCount, @nextBit, @tmp
+	.local @addCount, @shiftCount, @nextBit, @tmp, @firstByteInA
 	@addCount .set 0
 	@shiftCount .set 1
+	@firstByteInA .set 1
 
 	.repeat 8 * .sizeof(bcdInput) - 3, bit
 		; This code essentially runs the algorithm on build-time, using
@@ -94,10 +94,16 @@
 		asl bcdInput+.sizeof(bcdInput)-1-((bit + 3) / 8)
 
 		.repeat @shiftCount, i
-			.if i < @addCount
-				.if !(bit = 0 && i = 0)
-					ldx @bcdScratch-i
+			.if @firstByteInA = 1 && i = 0
+				tax
+				lda bcdAdd3Table, x
+				rol a
+				.if @addCount > 1
+					sta @bcdScratch-i
+					@firstByteInA .set 0
 				.endif
+			.elseif i < @addCount
+				ldx @bcdScratch-i
 				lda bcdAdd3Table, x
 				rol a
 				sta @bcdScratch-i
@@ -106,6 +112,9 @@
 			.endif
 		.endrepeat
 	.endrepeat
+	.if @firstByteInA = 1
+		sta @bcdScratch-0
+	.endif
 .endmacro
 
 ; Expands the packed BCD into ASCII digits in a straightforward way.
