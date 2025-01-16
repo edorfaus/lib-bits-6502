@@ -138,6 +138,14 @@
 		ora #'0'
 		sta bcdOutput+.sizeof(bcdOutput)-1-(i*2)-1
 	.endrepeat
+
+	.if (.sizeof(bcdOutput) & 1) <> 0
+		.local @i
+		@i = .sizeof(bcdOutput) / 2
+		lda @bcdScratch-@i
+		ora #'0'
+		sta bcdOutput+.sizeof(bcdOutput)-1-(@i*2)
+	.endif
 .endmacro
 
 ; Expands the packed BCD into ASCII digits using the MMC5's multiplier.
@@ -164,6 +172,14 @@
 		ora #'0'
 		sta bcdOutput+.sizeof(bcdOutput)-1-(i*2)-1
 	.endrepeat
+
+	.if (.sizeof(bcdOutput) & 1) <> 0
+		.local @i
+		@i = .sizeof(bcdOutput) / 2
+		lda @bcdScratch-@i
+		ora #'0'
+		sta bcdOutput+.sizeof(bcdOutput)-1-(@i*2)
+	.endif
 .endmacro
 
 ; Define the table if not already done. Used internally by the macros
@@ -203,6 +219,15 @@
 		lda bcdAsciiTableHi, x
 		sta bcdOutput+.sizeof(bcdOutput)-1-(i*2)-1
 	.endrepeat
+
+	.if (.sizeof(bcdOutput) & 1) <> 0
+		.local @i
+		@i = .sizeof(bcdOutput) / 2
+		lda @bcdScratch-@i
+		ora #'0'
+		sta bcdOutput+.sizeof(bcdOutput)-1-(@i*2)
+	.endif
+
 	_mSetup_BcdToAsciiTableHi
 .endmacro
 
@@ -222,6 +247,15 @@
 		lda bcdAsciiTableHi, x
 		sta bcdOutput+.sizeof(bcdOutput)-1-(i*2)-1
 	.endrepeat
+
+	.if (.sizeof(bcdOutput) & 1) <> 0
+		.local @i
+		@i = .sizeof(bcdOutput) / 2
+		lda @bcdScratch-@i
+		ora #'0'
+		sta bcdOutput+.sizeof(bcdOutput)-1-(@i*2)
+	.endif
+
 	_mSetup_BcdToAsciiTableHi
 	.ifndef bcdAsciiTableLo
 		.pushseg
