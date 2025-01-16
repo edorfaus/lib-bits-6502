@@ -24,6 +24,11 @@
 	.assert .sizeof(bcdInput) > 0, error, "invalid bcdInput"
 	.assert .sizeof(bcdOutput) > 0, error, "invalid bcdOutput"
 
+	; If this is defined (regardless of value), then the first scratch
+	; byte is kept in Y instead of memory once it can't be kept in A.
+	; That makes the code faster and smaller, but also clobber Y.
+	;@firstByteInY = 1
+
 	.local @bcdScratchSize, @bcdScratch
 	@bcdScratchSize = (.sizeof(bcdOutput) + 1) / 2
 	; The scratch space is stored big-endian, because that allows the
@@ -99,9 +104,17 @@
 				lda bcdAdd3Table, x
 				rol a
 				.if @addCount > 1
-					sta @bcdScratch-i
+					.ifdef @firstByteInY
+						tay
+					.else
+						sta @bcdScratch-i
+					.endif
 					@firstByteInA .set 0
 				.endif
+			.elseif .defined(@firstByteInY) && i = 0
+				lda bcdAdd3Table, y
+				rol a
+				tay
 			.elseif i < @addCount
 				ldx @bcdScratch-i
 				lda bcdAdd3Table, x
@@ -114,6 +127,8 @@
 	.endrepeat
 	.if @firstByteInA = 1
 		sta @bcdScratch-0
+	.elseif .defined(@firstByteInY)
+		sty @bcdScratch-0
 	.endif
 .endmacro
 
