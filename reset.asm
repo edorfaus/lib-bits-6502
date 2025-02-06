@@ -70,10 +70,11 @@ RESET:
 		sty PPUCtrl
 		sta PPUMask
 		ldy #$3F
+		bit PPUStatus ; reset the w latch, in case it got out of sync.
 		sty PPUAddr
 		sta PPUAddr
 		sty PPUData
-		; 2+4+4 + 2+4+4+4 = 24 cycles
+		; 2+4+4 + 2+4+4+4+4 = 28 cycles
 
 		sta $00, x   ; ZP
 		sta $0100, x ; Stack
@@ -89,8 +90,8 @@ RESET:
 
 		inx
 	bne @clearRamLoop
-	; 2 + (24 + 4 + 5*7 + 2 + 3)*256 - 1 = 17409 cycles
-	; or, if the code straddles a page boundary, 17664 cycles
+	; 2 + (28 + 4 + 5*7 + 2 + 3)*256 - 1 = 18433 cycles
+	; or, if the code straddles a page boundary, 18689 cycles
 
 .ifdef Sprite0
 	; Initialize the OAM buffer such that the sprites are off-screen,
@@ -126,12 +127,12 @@ RESET:
 
 	; We are now in vblank, with a stable PPU that will accept writes.
 
-	; We don't retry setting the BG here because the main code will
-	; probably be setting the actually wanted palette soon anyway.
-
-	; Ensure that these are zero, even if the PPU ignored us earlier.
+	; Ensure that these are zero, as we changed them earlier.
 	stx PPUCtrl
 	stx PPUMask
+
+	; We don't retry setting the BG here because the main code will
+	; probably be setting the actually wanted palette soon anyway.
 
 	; Jump to the main entry point of the program.
 	jmp Main
