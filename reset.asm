@@ -10,17 +10,23 @@ RESET:
 	sei
 	cld
 
-	; APU: inhibit IRQ, 4-step mode, reset frame counter
-	ldx #%0100_0000
-	stx APUFrameCntr
+	; These are the power-up/reset state of these registers, and the PPU
+	; ignores these writes at power-up and reset. However, some consoles
+	; don't reset the PPU, only the CPU, and this needs to be done then.
+	ldx #$00
+	stx PPUCtrl ; disable PPU NMI, various other settings
+	stx PPUMask ; turn off all rendering, not grayscale, no emphasis
 
-	; Reset the stack
-	ldx #$FF
+	; Reset the stack (set it to $FF)
+	dex
 	txs
 
 	; Set X = 0
 	inx
 
+	; APU: inhibit IRQ, 4-step mode, reset frame counter
+	ldy #%0100_0000
+	sty APUFrameCntr
 	; APU DMC: disable IRQs, no looping, rate index = 0
 	stx APUDMCFlagsRate
 	; APU: disable all audio channels, clear DMC interrupt flag
@@ -28,29 +34,12 @@ RESET:
 	; APU: set DMC output value to 0 so it doesn't affect other volumes
 	stx APUDMCDirectLoad
 
-	; These are the power-up/reset state of these registers, and the PPU
-	; ignores these writes at power-up and (only sometimes) at reset,
-	; but this makes sure in case we got here some other way.
-	stx PPUCtrl ; disable PPU NMI, various other settings
-	stx PPUMask ; turn off all rendering, not grayscale, no emphasis
-
 	; Clear the vblank flag, since it might be set spuriously.
 	; Also resets the w latch to get address writes into a known state.
 	bit PPUStatus
 
-	; We want to make the screen black as soon as possible, which means
-	; we have to set the background color to black. However, the PPU may
-	; (or may not) ignore this until about a frame has passed, something
-	; we here work around by re-doing the writes several times. It is
-	; acceptable that this may end up causing a short graphical glitch.
-	; We avoid the palette corruption bug by enabling vertical writes.
-	ldy #%0000_0100
-	sty PPUCtrl ; Disable PPU NMI, vertical mode, various other settings
-	stx PPUMask ; turn off all rendering, not grayscale, no emphasis
-	ldy #$3F
-	sty PPUAddr
-	stx PPUAddr
-	sty PPUData
+	; While we want to change the background to black as soon as we can,
+	; trying to do so before the PPU is listening risks bus conflicts.
 
 	; We need to wait for the PPU to stabilize; this is the first of the
 	; two loops we use to do that. (This waits for vblank.)
@@ -58,26 +47,47 @@ RESET:
 		bit PPUStatus
 	bpl :-
 
-	; We know there's about 29780 cycles in each frame, so we have
-	; about that many cycles to wait before we know the PPU is stable.
+	; Since power-on and reset move the PPU to the top of the frame, and
+	; we just hit vblank, we should here have spent about 27384 cycles.
+	; Since the PPU only starts listening after about 29658 CPU cycles,
+	; we still need to spend a few more before we try using it.
+
+	; Also, we want to jump to the main code at the start of vblank, so
+	; we'll end up spending about 29780 cycles anyway.
 	; We may as well spend what we can of them doing something useful.
 
 	; Clear the internal main RAM. Conveniently, X is already 0.
 	txa
-	@clearRamLoop:
-		; As above, just in case we now can, try to set the BG to black.
-		ldy #%0000_0100
-		sty PPUCtrl
-		sta PPUMask
-		ldy #$3F
-		bit PPUStatus ; reset the w latch, in case it got out of sync.
-		sty PPUAddr
-		sta PPUAddr
-		sty PPUData
-		; 2+4+4 + 2+4+4+4+4 = 28 cycles
 
-		sta $00, x   ; ZP
+	; We start by doing just the stack separately, because that spends
+	; enough cycles that the PPU should have started listening to us.
+	:
 		sta $0100, x ; Stack
+		inx
+	bne :-
+	; 2 + (5 + 2 + 3) * 256 - 1 = 2561 cycles
+	; 27384 + 2561 = 29945 cycles, which is a little more than we need
+	; (but I'd rather have that buffer instead of risking being short).
+
+	; Now that the PPU should be listening to us, set the background
+	; color to be black. It is acceptable that this may end up causing a
+	; short graphical glitch (since we're in the visible frame area).
+	stx PPUMask ; turn off all rendering, not grayscale, no emphasis
+	; We avoid the palette corruption bug by enabling vertical writes.
+	ldy #%0000_0100
+	sty PPUCtrl ; Disable PPU NMI, vertical mode, various other settings
+	ldy #$3F
+	bit PPUStatus ; Reset the w latch, just is case
+	sty PPUAddr
+	stx PPUAddr
+	sty PPUData
+	stx PPUCtrl ; Turn vertical mode back off
+	; 4 + 2+4 + 2 + 4 + 4+4+4 + 4 = 32 cycles
+
+	; Now clear the rest of internal RAM.
+	@clearRamLoop:
+		sta $00, x   ; ZP
+		;sta $0100, x ; Stack ; this is handled separately above
 		sta $0200, x ; OAM buffer (in the default linker config)
 		sta $0300, x
 		sta $0400, x
@@ -90,8 +100,8 @@ RESET:
 
 		inx
 	bne @clearRamLoop
-	; 2 + (28 + 4 + 5*7 + 2 + 3)*256 - 1 = 18433 cycles
-	; or, if the code straddles a page boundary, 18689 cycles
+	; 2 + (4 + 5*6 + 2 + 3) * 256 - 1 = 9985 cycles
+	; or, if the code straddles a page boundary, 10240 cycles
 
 .ifdef Sprite0
 	; Initialize the OAM buffer such that the sprites are off-screen,
@@ -120,19 +130,16 @@ RESET:
 	; or, if the code straddles a page boundary, 2176 cycles
 .endif
 
-	; This is the second loop to wait for the PPU to have stabilized.
+	; Total so far: 2561 + 32 + 9985 + 2113 = 14691 cycles,
+	; or if straddling a page boundary, at most 14946 cycles,
+	; since the first vblank was detected.
+
+	; This loop, much like the first one, waits for vblank to happen.
 	:
 		bit PPUStatus
 	bpl :-
 
 	; We are now in vblank, with a stable PPU that will accept writes.
-
-	; Ensure that these are zero, as we changed them earlier.
-	stx PPUCtrl
-	stx PPUMask
-
-	; We don't retry setting the BG here because the main code will
-	; probably be setting the actually wanted palette soon anyway.
 
 	; Jump to the main entry point of the program.
 	jmp Main
